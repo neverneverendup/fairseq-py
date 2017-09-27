@@ -47,6 +47,10 @@ def main():
         os.makedirs(args.save_dir)
     torch.manual_seed(args.seed)
 
+    # Setting args.max_tokens to infinity(same as setting to None)
+    if args.max_tokens == 0:
+        args.max_tokens = None
+
     # Load dataset
     dataset = data.load_with_check(args.data, args.source_lang, args.target_lang)
     if args.source_lang is None or args.target_lang is None:
