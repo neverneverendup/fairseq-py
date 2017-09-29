@@ -21,8 +21,14 @@ from fairseq.sequence_generator import SequenceGenerator
 def main():
     parser = options.get_parser('Trainer')
     dataset_args = options.add_dataset_args(parser)
-    dataset_args.add_argument('--max-tokens', default=6000, type=int, metavar='N',
+    dataset_args.add_argument('--max-tokens', default=0, type=int, metavar='N',
                               help='maximum number of tokens in a batch')
+    dataset_args.add_argument('--batch-size', default=32, type=int, metavar='N',
+                              help='batch size')
+    dataset_args.add_argument('--test-batch-size', default=32, type=int, metavar='N',
+                              help='batch size for test set')
+    dataset_args.add_argument('--valid-batch-size', default=32, type=int, metavar='N',
+                              help='batch size for validation set')
     dataset_args.add_argument('--train-subset', default='train', metavar='SPLIT',
                               choices=['train', 'valid', 'test'],
                               help='data subset to use for training (train, valid, test)')
@@ -118,7 +124,10 @@ def main():
 def train(args, epoch, batch_offset, trainer, criterion, dataset, num_gpus):
     """Train the model for one epoch."""
 
-    itr = dataset.dataloader(args.train_subset, num_workers=args.workers,
+    itr = dataset.dataloader(args.train_subset, batch_size=args.batch_size,
+                             test_batch_size=args.test_batch_size,
+                             valid_batch_size=args.valid_batch_size,
+                             num_workers=args.workers,
                              max_tokens=args.max_tokens, seed=args.seed, epoch=epoch,
                              max_positions=args.max_positions,
                              sample_without_replacement=args.sample_without_replacement)
