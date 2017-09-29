@@ -85,22 +85,29 @@ class LanguageDatasets(object):
         self.dst_dict = dst_dict
         self.splits = {}
 
-    def dataloader(self, split, batch_size=1, num_workers=0,
+    def dataloader(self, split, batch_size=1, valid_batch_size = None, test_batch_size = None, num_workers=0,
                    max_tokens=None, seed=None, epoch=1,
                    sample_without_replacement=0, max_positions=1024):
         dataset = self.splits[split]
+
+        if valid_batch_size == None:
+            valid_batch_size = batch_size
+        if test_batch_size == None:
+            test_batch_size = batch_size
+
         if split.startswith('train'):
             with numpy_seed(seed):
                 batch_sampler = shuffled_batches_by_size(
                     dataset.src, dataset.dst,
+                    batch_size=batch_size,
                     max_tokens=max_tokens, epoch=epoch,
                     sample=sample_without_replacement,
                     max_positions=max_positions)
         elif split.startswith('valid'):
-            batch_sampler = list(batches_by_size(dataset.src, batch_size, max_tokens, dst=dataset.dst,
+            batch_sampler = list(batches_by_size(dataset.src, valid_batch_size, max_tokens, dst=dataset.dst,
                                                  max_positions=max_positions))
         else:
-            batch_sampler = list(batches_by_size(dataset.src, batch_size, max_tokens, max_positions=max_positions))
+            batch_sampler = list(batches_by_size(dataset.src, test_batch_size, max_tokens, max_positions=max_positions))
 
         return torch.utils.data.DataLoader(
             dataset,
@@ -232,7 +239,7 @@ def batches_by_size(src, batch_size=None, max_tokens=None, dst=None, max_positio
         yield batch
 
 
-def shuffled_batches_by_size(src, dst, max_tokens=None, epoch=1, sample=0, max_positions=1024):
+def shuffled_batches_by_size(src, dst, batch_size=None, max_tokens=None, epoch=1, sample=0, max_positions=1024):
     """Returns batches of indices, bucketed by size and then shuffled. Batches
     may contain sequences of different lengths."""
     assert isinstance(src, IndexedDataset) and isinstance(dst, IndexedDataset)
@@ -255,10 +262,11 @@ def shuffled_batches_by_size(src, dst, max_tokens=None, epoch=1, sample=0, max_p
             if src.sizes[idx] < 2 or dst.sizes[idx] < 2 or \
                             src.sizes[idx] > max_positions - 2 or \
                             dst.sizes[idx] > max_positions - 2:
+                print("Ignoring sample at index {} because of max_position criterion or length < 2!".format(idx))
                 ignored.append(idx)
                 continue
             sample_len = max(sample_len, src.sizes[idx], dst.sizes[idx])
-            if len(batch) > 0 and (len(batch) + 1) * sample_len > max_tokens:
+            if (batch_size != None and len(batch) == batch_size) or (len(batch) > 0 and (len(batch) + 1) * sample_len > max_tokens):
                 yield batch
                 batch = []
                 sample_len = max(src.sizes[idx], dst.sizes[idx])
