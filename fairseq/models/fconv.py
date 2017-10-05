@@ -7,12 +7,33 @@
 #
 
 import math
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
 from fairseq.modules import BeamableMM, LinearizedConvolution
 
+def load_embeddings(embed_path, vocab, embeddings):
+    if embed_path == None:
+        return embeddings
+    else:
+        embed_dict = dict()
+        with open(embed_path) as f_embed:
+            for line in f_embed:
+                pieces = line.strip().split()
+                embed_dict[pieces[0]] = [float(weight) for weight in pieces[1:]]
+
+        hits=0
+        embed_np = embeddings.weight.data.numpy()
+        for idx in range(len(vocab)):
+            token = vocab[idx]
+            if token in embed_dict:
+                hits += 1
+                embed_np[idx] = np.array(embed_dict[token])
+        print("| Found {}/{} types in embeddings file.".format(hits, len(vocab)))
+        embeddings.weight.data.copy_(torch.from_numpy(embed_np))
+        return embeddings
 
 class FConvModel(nn.Module):
     def __init__(self, encoder, decoder, padding_idx=1):
@@ -67,12 +88,17 @@ class FConvModel(nn.Module):
 
 class Encoder(nn.Module):
     """Convolutional encoder"""
-    def __init__(self, num_embeddings, embed_dim=512, max_positions=1024,
-                 convolutions=((512, 3),) * 20, dropout=0.1, padding_idx=1):
+    def __init__(self, num_embeddings,  embed_dim=512, max_positions=1024,
+                 convolutions=((512, 3),) * 20, dropout=0.1, padding_idx=1, embed_path = None, dictionary = None):
         super(Encoder, self).__init__()
         self.dropout = dropout
         self.num_attention_layers = None
         self.embed_tokens = Embedding(num_embeddings, embed_dim, padding_idx)
+
+        if embed_path and dictionary:
+            print("| Loading encoder embeddings from {}".format(embed_path))
+            self.embed_tokens = load_embeddings(embed_path, dictionary, self.embed_tokens)
+
         self.embed_positions = Embedding(max_positions, embed_dim, padding_idx)
 
         in_channels = convolutions[0][0]
@@ -162,16 +188,21 @@ class Decoder(nn.Module):
     """Convolutional decoder"""
     def __init__(self, num_embeddings, embed_dim=512, out_embed_dim=256,
                  max_positions=1024, convolutions=((512, 3),) * 20,
-                 attention=True, dropout=0.1, padding_idx=1):
+                 attention=True, dropout=0.1, padding_idx=1, embed_path = None, dictionary = None):
         super(Decoder, self).__init__()
         self.dropout = dropout
-
         in_channels = convolutions[0][0]
         if isinstance(attention, bool):
             # expand True into [True, True, ...] and do the same with False
             attention = [attention] * len(convolutions)
 
         self.embed_tokens = Embedding(num_embeddings, embed_dim, padding_idx)
+
+        if embed_path and dictionary:
+            print("| Loading decoder embeddings from {}".format(embed_path))
+            self.embed_tokens = load_embeddings(embed_path, dictionary, self.embed_tokens)
+
+
         self.embed_positions = Embedding(max_positions, embed_dim, padding_idx)
         self.fc1 = Linear(embed_dim, in_channels, dropout=dropout)
         self.projections = nn.ModuleList()
@@ -498,6 +529,7 @@ def parse_arch(args):
 
 def build_model(args, dataset):
     padding_idx = dataset.dst_dict.pad()
+
     encoder = Encoder(
         len(dataset.src_dict),
         embed_dim=args.encoder_embed_dim,
@@ -505,6 +537,8 @@ def build_model(args, dataset):
         dropout=args.dropout,
         padding_idx=padding_idx,
         max_positions=args.max_positions,
+        embed_path=args.encoder_embed_path,
+        dictionary=dataset.src_dict
     )
     decoder = Decoder(
         len(dataset.dst_dict),
@@ -515,5 +549,7 @@ def build_model(args, dataset):
         dropout=args.dropout,
         padding_idx=padding_idx,
         max_positions=args.max_positions,
+        embed_path=args.decoder_embed_path,
+        dictionary=dataset.dst_dict
     )
     return FConvModel(encoder, decoder, padding_idx)
