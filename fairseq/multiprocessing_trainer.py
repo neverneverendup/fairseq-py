@@ -95,14 +95,14 @@ class MultiprocessingTrainer(MultiprocessingEventLoop):
     def _async_get_model(self, rank, device_id):
         return self.model
 
-    def save_checkpoint(self, args, epoch, batch_offset, val_loss=None):
+    def save_checkpoint(self, args, epoch, batch_offset, val_loss=None, validation_script=None):
         """Save a checkpoint for the current model."""
         self.call_async(0, '_async_save_checkpoint', args=args, epoch=epoch,
-                        batch_offset=batch_offset, val_loss=val_loss).gen()
+                        batch_offset=batch_offset, val_loss=val_loss, validation_script=validation_script).gen()
 
-    def _async_save_checkpoint(self, rank, device_id, args, epoch, batch_offset, val_loss):
+    def _async_save_checkpoint(self, rank, device_id, args, epoch, batch_offset, val_loss, validation_script):
         utils.save_checkpoint(args, epoch, batch_offset, self.model,
-                              self.optimizer, self.lr_scheduler, val_loss)
+                              self.optimizer, self.lr_scheduler, val_loss, validation_script)
 
     def load_checkpoint(self, filename):
         """Load a checkpoint into the model replicas in each process."""

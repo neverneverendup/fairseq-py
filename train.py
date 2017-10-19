@@ -38,6 +38,8 @@ def main():
     dataset_args.add_argument('--test-subset', default='test', metavar='SPLIT',
                               help='comma separated list ofdata subset '
                                    'to use for testing (train, valid, test)')
+    dataset_args.add_argument('--valid-script', nargs='+', metavar='PATH', help='path to external validation script (optional).')
+
     options.add_optimization_args(parser)
     options.add_checkpoint_args(parser)
     options.add_model_args(parser)
@@ -101,9 +103,11 @@ def main():
             if k == 0:
                 if not args.no_save:
                     # save checkpoint
-                    trainer.save_checkpoint(args, epoch, 0, val_loss)
+                    trainer.save_checkpoint(args, epoch, 0, val_loss, validation_script=args.valid_script)
+
                 # only use first validation loss to update the learning schedule
                 lr = trainer.lr_step(val_loss, epoch)
+
 
         epoch += 1
         batch_offset = 0

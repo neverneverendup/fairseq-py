@@ -10,12 +10,14 @@ import logging
 import os
 import torch
 import traceback
+import subprocess
 
 from torch.autograd import Variable
 from torch.serialization import default_restore_location
 
 from fairseq import criterions, data, models
 
+validation_proc = None
 
 def parse_args_and_arch(parser):
     args = parser.parse_args()
@@ -46,7 +48,9 @@ def torch_persistent_save(*args, **kwargs):
                 logging.error(traceback.format_exc())
 
 
-def save_checkpoint(args, epoch, batch_offset, model, optimizer, lr_scheduler, val_loss=None):
+def save_checkpoint(args, epoch, batch_offset, model, optimizer, lr_scheduler, val_loss=None, validation_script=None):
+
+    global validation_proc
     state_dict = {
         'args': args,
         'epoch': epoch,
@@ -60,16 +64,25 @@ def save_checkpoint(args, epoch, batch_offset, model, optimizer, lr_scheduler, v
     if batch_offset == 0:
         if not args.no_epoch_checkpoints:
             epoch_filename = os.path.join(args.save_dir, 'checkpoint{}.pt'.format(epoch))
+            print('| epoch {:03d} | saving checkpoint '.format(epoch, epoch_filename))
             torch_persistent_save(state_dict, epoch_filename)
+            if validation_script:
+                if validation_proc and validation_proc.poll() is None:
+                    print('| epoch {:03d} | waiting for previous validation process to finish.'.format(epoch))
+                    validation_proc.wait()
+                validation_proc = subprocess.Popen(validation_script + [epoch_filename])
 
         assert val_loss is not None
         if not hasattr(save_checkpoint, 'best') or val_loss < save_checkpoint.best:
             save_checkpoint.best = val_loss
             best_filename = os.path.join(args.save_dir, 'checkpoint_best.pt')
+            print('| epoch {:03d} | saving best checkpoint'.format(epoch, best_filename))
             torch_persistent_save(state_dict, best_filename)
 
     last_filename = os.path.join(args.save_dir, 'checkpoint_last.pt')
+    print('| epoch {:03d} | saving last checkpoint'.format(epoch, last_filename))
     torch_persistent_save(state_dict, last_filename)
+
 
 
 def load_checkpoint(filename, model, optimizer, lr_scheduler, cuda_device=None):
