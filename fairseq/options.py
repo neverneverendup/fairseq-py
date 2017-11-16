@@ -136,9 +136,9 @@ def add_model_args(parser):
                        help='decoder output embedding dimension')
     group.add_argument('--decoder-attention', type=str, metavar='EXPR',
                        help='decoder attention [True, ...]')
-    group.add_argument('--encoder-embed-path', type=str, metavar='STR',
+    group.add_argument('--encoder-embed-path', default=None, type=str, metavar='STR',
                        help='path to pre-trained encoder embeddings')
-    group.add_argument('--decoder-embed-path', type=str, metavar='STR',
+    group.add_argument('--decoder-embed-path', default=None, type=str, metavar='STR',
                        help='path to pre-trained decoder embeddings')
     # These arguments have default values independent of the model:
     group.add_argument('--dropout', default=0.1, type=float, metavar='D',
