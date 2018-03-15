@@ -119,8 +119,11 @@ def load_ensemble_for_inference(filenames, data_path):
 
     # load dataset
     args = states[0]['args']
+    if args.decoder_embed_path:
+        args.decoder_embed_path = None
+    if args.encoder_embed_path:
+        args.encoder_embed_path = None
     dataset = data.load(data_path, args.source_lang, args.target_lang)
-
     # build models
     ensemble = []
     for state in states:
