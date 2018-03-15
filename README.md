@@ -1,3 +1,6 @@
+#### Forked Version
+This is a forked and modified version of [fairseq-py](https://github.com/facebookresearch/fairseq-py).. This version requires PyTorch 0.2.0post3 compiled from source which has the ATen module.
+
 # Introduction
 FAIR Sequence-to-Sequence Toolkit (PyTorch)
 
